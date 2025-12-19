@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPSPlanner</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Space+Mono:wght@400;700&family=VT323&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --font-DelaGothicOne: 'Dela Gothic One', cursive;
+            --font-SpaceMono: 'Space Mono', monospace;
+            --font-Pixel: 'VT323', monospace;
+            --font-Inter: 'Inter', sans-serif;
+            --neon-green: #39ff14;
+            --dark-green: #14532d;
+            --sidebar-width: 250px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: var(--font-SpaceMono);
+            overflow-x: hidden; 
+            transition: background-color 0.5s ease;
+        }
+
+        /* --- MATRIX BACKGROUND --- */
+        .matrix-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: -100; overflow: hidden; display: block; }
+        .matrix-pattern { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .matrix-column { position: absolute; top: -100%; width: 20px; height: 100%; font-size: 16px; line-height: 18px; font-weight: bold; animation: fall linear infinite; white-space: nowrap; opacity: 0.8; }
+        .matrix-column::before { content: "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; position: absolute; top: 0; left: 0; background: linear-gradient(to bottom, #ffffff 0%, #ffffff 5%, #00ff41 10%, #00ff41 20%, #00dd33 30%, #00bb22 40%, #009911 50%, #007700 60%, #005500 70%, #003300 80%, rgba(0, 255, 65, 0.5) 90%, transparent 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; writing-mode: vertical-lr; letter-spacing: 1px; }
+        .matrix-column:nth-child(odd)::before { content: "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン123456789"; }
+        .matrix-column:nth-child(even)::before { content: "ガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヴァィゥェォャュョッABCDEFGHIJKLMNOPQRSTUVWXYZ"; }
+        @keyframes fall { 0% { transform: translateY(-20%); opacity: 1; } 100% { transform: translateY(120%); opacity: 0; } }
+
+        /* --- LOADER --- */
+        #loader-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .loader { position: relative; width: 150px; height: 150px; background: transparent; border-radius: 50%; box-shadow: 25px 25px 75px rgba(0,0,0,0.55); border: 1px solid #333; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .loader::before { content: ''; position: absolute; inset: 20px; background: transparent; border: 1px dashed #444; border-radius: 50%; box-shadow: inset -5px -5px 25px rgba(0,0,0,0.25), inset 5px 5px 35px rgba(0,0,0,0.25); }
+        .loader::after { content: ''; position: absolute; width: 50px; height: 50px; border-radius: 50%; border: 1px dashed #444; box-shadow: inset -5px -5px 25px rgba(0,0,0,0.25), inset 5px 5px 35px rgba(0,0,0,0.25); }
+        .loader span { position: absolute; top: 50%; left: 50%; width: 50%; height: 100%; background: transparent; transform-origin: top left; animation: radar81 2s linear infinite; border-top: 1px dashed #fff; }
+        .loader span::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: seagreen; transform-origin: top left; transform: rotate(-55deg); filter: blur(30px) drop-shadow(20px 20px 20px seagreen); }
+        @keyframes radar81 { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- LAYOUT & UTILS --- */
+        #app-container { display: none; width: 100%; min-height: 100vh; }
+        .login-view { display: flex; justify-content: center; align-items: center; height: 100vh; width: 100%; animation: fadeIn 1s ease-in; }
+        .dashboard-view { display: none; flex-direction: column; align-items: center; width: 100%; padding-top: 80px; box-sizing: border-box; }
+        .page-section { display: none; width: 100%; animation: fadeIn 0.5s ease-in; justify-content: center; align-items: flex-start; flex-wrap: wrap; gap: 50px; padding-bottom: 50px; }
+        .page-section.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* --- SIDEBAR & HEADER --- */
+        .toggle-btn { position: fixed; top: 20px; left: 20px; z-index: 200; background: rgba(0,0,0,0.8); border: 2px solid var(--neon-green); color: var(--neon-green); padding: 10px 15px; font-size: 1.5rem; cursor: pointer; border-radius: 5px; box-shadow: 0 0 10px var(--neon-green); transition: 0.3s; }
+        .toggle-btn:hover { background: var(--neon-green); color: black; }
+        .sidebar { position: fixed; top: 0; left: -300px; width: var(--sidebar-width); height: 100%; background: rgba(0, 0, 0, 0.95); border-right: 2px solid var(--dark-green); z-index: 150; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; padding-top: 80px; box-shadow: 5px 0 30px rgba(0, 255, 65, 0.1); }
+        .sidebar.open { left: 0; border-right: 2px solid var(--neon-green); }
+        .nav-link { padding: 15px 30px; color: #888; text-decoration: none; font-family: var(--font-SpaceMono); font-size: 1.1rem; text-transform: uppercase; transition: 0.2s; border-left: 3px solid transparent; cursor: pointer; }
+        .nav-link:hover, .nav-link.active { color: var(--neon-green); background: rgba(57, 255, 20, 0.05); border-left: 3px solid var(--neon-green); padding-left: 40px; text-shadow: 0 0 8px rgba(57, 255, 20, 0.4); }
+        
+        .header-controls { position: fixed; top: 20px; right: 20px; z-index: 200; display: none; align-items: center; gap: 20px; }
+        
+        /* MATRIX TOGGLE */
+        .matrix-toggle-wrapper { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .matrix-toggle-wrapper input { opacity: 0; width: 0; height: 0; }
+        .matrix-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #fff; transition: .4s; border-radius: 34px; }
+        .matrix-slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: #aaa; transition: .4s; border-radius: 50%; }
+        input:checked + .matrix-slider { background-color: #fff; }
+        input:checked + .matrix-slider:before { transform: translateX(26px); background-color: #39ff14; box-shadow: 0 0 10px #39ff14; }
+
+        /* LOGOUT BTN */
+        .Btn { display: flex; align-items: center; justify-content: flex-start; width: 45px; height: 45px; border: none; border-radius: 50%; cursor: pointer; position: relative; overflow: hidden; transition-duration: .3s; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.199); background-color: rgb(255, 65, 65); }
+        .sign { width: 100%; transition-duration: .3s; display: flex; align-items: center; justify-content: center; }
+        .sign svg { width: 17px; fill: white; }
+        .text { position: absolute; right: 0%; width: 0%; opacity: 0; color: white; font-size: 1.2em; font-weight: 600; transition-duration: .3s; }
+        .Btn:hover { width: 125px; border-radius: 40px; transition-duration: .3s; }
+        .Btn:hover .sign { width: 30%; transition-duration: .3s; padding-left: 20px; }
+        .Btn:hover .text { opacity: 1; width: 70%; transition-duration: .3s; padding-right: 10px; }
+        .Btn:active { transform: translate(2px ,2px); }
+
+        /* --- COURSES ALERT BOX STYLES --- */
+        .space-y-2 > * + * { margin-top: 0.5rem; }
+        .p-4 { padding: 1rem; }
+        .p-2 { padding: 0.5rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .font-semibold { font-weight: 600; }
+        .text-xs { font-size: 0.75rem; line-height: 1rem; }
+        .mr-2 { margin-right: 0.5rem; }
+        .h-5 { height: 1.25rem; }
+        .w-5 { width: 1.25rem; }
+        .border-l-4 { border-left-width: 4px; }
+        .alert-green { background-color: #dcfce7; border-color: #22c55e; color: #14532d; }
+        .alert-blue { background-color: #dbeafe; border-color: #3b82f6; color: #1e3a8a; }
+        .alert-yellow { background-color: #fef9c3; border-color: #eab308; color: #713f12; }
+        .alert-red { background-color: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
+        .alert-box { transition: transform 0.2s; cursor: pointer; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
+        .alert-box:hover { transform: scale(1.02); filter: brightness(1.1); }
+        .file-link { display: block; margin-left: 2rem; color: #39ff14; text-decoration: none; padding: 5px 0; font-size: 0.9rem; border-bottom: 1px dashed #333; transition: color 0.3s; }
+        .file-link:hover { color: #fff; }
+
+        /* --- LOGIN FORM --- */
+        .form { --background: #d3d3d3; --input-focus: #2d8cf0; --font-color: #323232; --font-color-sub: #666; --bg-color: #fff; --main-color: #323232; padding: 20px; background: var(--background); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; border-radius: 5px; border: 2px solid var(--main-color); box-shadow: 4px 4px var(--main-color); }
+        .form > p { font-family: var(--font-DelaGothicOne); color: var(--font-color); font-weight: 700; font-size: 20px; margin: 0 0 15px 0; display: flex; flex-direction: column; width: 100%; text-align: center; }
+        .form > p > span { font-family: var(--font-SpaceMono); color: var(--font-color-sub); font-weight: 600; font-size: 17px; }
+        .separator { width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .separator > div { width: 100px; height: 3px; border-radius: 5px; background-color: var(--font-color-sub); }
+        .oauthButton { display: flex; justify-content: center; align-items: center; gap: 5px; padding: auto 15px 15px auto; width: 250px; height: 40px; border-radius: 5px; border: 2px solid var(--main-color); background-color: var(--bg-color); box-shadow: 4px 4px var(--main-color); font-size: 16px; font-weight: 600; color: var(--font-color); cursor: pointer; transition: all 250ms; position: relative; overflow: hidden; z-index: 1; }
+        .oauthButton::before { content: ""; position: absolute; top: 0; left: 0; height: 100%; width: 0; background-color: #212121; z-index: -1; box-shadow: 4px 8px 19px -3px rgba(0, 0, 0, 0.27); transition: all 250ms; }
+        .oauthButton:hover { color: #e8e8e8; }
+        .oauthButton:hover::before { width: 100%; }
+        .form > input { width: 250px; height: 40px; border-radius: 5px; border: 2px solid var(--main-color); background-color: var(--bg-color); box-shadow: 4px 4px var(--main-color); font-size: 15px; font-weight: 600; color: var(--font-color); padding: 5px 10px; outline: none; box-sizing: border-box; }
+        .icon { width: 1.5rem; height: 1.5rem; fill: currentColor; }
+        .radio-inputs { position: relative; display: flex; flex-wrap: wrap; border-radius: 4px; background-color: black; box-sizing: border-box; padding: 0.25rem; width: 250px; font-size: 14px; height: 46px; transition: clip-path 0.3s ease; }
+        .radio-inputs .radio { flex: 1 1 auto; text-align: center; }
+        .radio-inputs .radio input { display: none; }
+        .radio-inputs .radio .radio-item { display: flex; cursor: pointer; align-items: center; justify-content: center; border-radius: 4px; border: none; padding: 0.5rem 0; color: #c2c1be; transition: background-color 0.5s ease, font-weight 0.5s ease; }
+        .radio-inputs input:checked ~ .radio-item { background-color: #4d4a45; font-weight: 600; color: #fff; }
+        .radio-inputs input:checked ~ .radio { clip-path: polygon(0% 0%, 100% 0%, 90% 100%, 10% 100%); }
+
+        /* --- HERO & DASHBOARD --- */
+        .hero-container { text-align: left; max-width: 900px; padding: 0 40px; margin-top: 50px; }
+        .hero-title { font-family: var(--font-Inter); font-weight: 800; font-size: 4rem; line-height: 1.1; margin-bottom: 20px; color: white; }
+        .text-blue-gradient { background: linear-gradient(90deg, #3b82f6, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .text-mint-gradient { background: linear-gradient(90deg, #6ee7b7, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: block; }
+        .hero-description { font-family: var(--font-Inter); color: #9ca3af; font-size: 1.1rem; line-height: 1.6; margin-bottom: 40px; max-width: 750px; }
+        .start-btn { background-color: #67e8f9; color: #000; border: none; padding: 14px 28px; font-size: 1.1rem; font-weight: 700; border-radius: 8px; cursor: pointer; font-family: var(--font-Inter); transition: transform 0.2s, background-color 0.2s; }
+        .start-btn:hover { transform: scale(1.05); background-color: #22d3ee; }
+
+        /* --- 3D CARD --- */
+        .parent { width: 290px; height: 300px; perspective: 1000px; }
+        .card { height: 100%; border-radius: 50px; background: linear-gradient(135deg, rgb(0, 255, 214) 0%, rgb(8, 226, 96) 100%); transition: all 0.5s ease-in-out; transform-style: preserve-3d; box-shadow: rgba(5, 71, 17, 0) 40px 50px 25px -40px, rgba(5, 71, 17, 0.2) 0px 25px 25px -5px; }
+        .glass { transform-style: preserve-3d; position: absolute; inset: 8px; border-radius: 55px; border-top-right-radius: 100%; background: linear-gradient(0deg, rgba(255, 255, 255, 0.349) 0%, rgba(255, 255, 255, 0.815) 100%); transform: translate3d(0px, 0px, 25px); border-left: 1px solid white; border-bottom: 1px solid white; transition: all 0.5s ease-in-out; }
+        .content { padding: 100px 60px 0px 30px; transform: translate3d(0, 0, 26px); }
+        .content .title { display: block; color: #00894d; font-weight: 900; font-size: 20px; }
+        .content .text { display: block; color: rgba(0, 137, 78, 0.7647058824); font-size: 15px; margin-top: 20px; }
+        .bottom { padding: 10px 12px; transform-style: preserve-3d; position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; align-items: center; justify-content: space-between; transform: translate3d(0, 0, 26px); }
+        .bottom .view-more { display: flex; align-items: center; width: 40%; justify-content: flex-end; transition: all 0.2s ease-in-out; }
+        .bottom .view-more:hover { transform: translate3d(0, 0, 10px); }
+        .bottom .view-more .view-more-button { background: none; border: none; color: #00c37b; font-weight: bolder; font-size: 12px; cursor: pointer; }
+        .bottom .view-more .svg { fill: none; stroke: #00c37b; stroke-width: 3px; max-height: 15px; }
+        .bottom .social-buttons-container { display: flex; gap: 10px; transform-style: preserve-3d; }
+        .bottom .social-buttons-container .social-button { width: 30px; aspect-ratio: 1; padding: 5px; background: rgb(255, 255, 255); border-radius: 50%; border: none; display: grid; place-content: center; box-shadow: rgba(5, 71, 17, 0.5) 0px 7px 5px -5px; cursor: pointer; }
+        .bottom .social-buttons-container .social-button:first-child { transition: transform 0.2s ease-in-out 0.4s, box-shadow 0.2s ease-in-out 0.4s; }
+        .bottom .social-buttons-container .social-button:nth-child(2) { transition: transform 0.2s ease-in-out 0.6s, box-shadow 0.2s ease-in-out 0.6s; }
+        .bottom .social-buttons-container .social-button:nth-child(3) { transition: transform 0.2s ease-in-out 0.8s, box-shadow 0.2s ease-in-out 0.8s; }
+        .bottom .social-buttons-container .social-button .svg { width: 15px; fill: #00894d; }
+        .bottom .social-buttons-container .social-button:hover { background: black; }
+        .bottom .social-buttons-container .social-button:hover .svg { fill: white; }
+        .bottom .social-buttons-container .social-button:active { background: rgb(255, 234, 0); }
+        .bottom .social-buttons-container .social-button:active .svg { fill: black; }
+        .logo { position: absolute; right: 0; top: 0; transform-style: preserve-3d; }
+        .logo .circle { display: block; position: absolute; aspect-ratio: 1; border-radius: 50%; top: 0; right: 0; box-shadow: rgba(100, 100, 111, 0.2) -10px 10px 20px 0px; -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); background: rgba(0, 249, 203, 0.2); transition: all 0.5s ease-in-out; }
+        .logo .circle1 { width: 170px; transform: translate3d(0, 0, 20px); top: 8px; right: 8px; }
+        .logo .circle2 { width: 140px; transform: translate3d(0, 0, 40px); top: 10px; right: 10px; backdrop-filter: blur(1px); transition-delay: 0.4s; }
+        .logo .circle3 { width: 110px; transform: translate3d(0, 0, 60px); top: 17px; right: 17px; transition-delay: 0.8s; }
+        .logo .circle4 { width: 80px; transform: translate3d(0, 0, 80px); top: 23px; right: 23px; transition-delay: 1.2s; }
+        .logo .circle5 { width: 50px; transform: translate3d(0, 0, 100px); top: 30px; right: 30px; display: grid; place-content: center; transition-delay: 1.6s; }
+        .logo .circle5 .svg { width: 20px; fill: white; }
+        .parent:hover .card { transform: rotate3d(1, 1, 0, 30deg); box-shadow: rgba(5, 71, 17, 0.3) 30px 50px 25px -40px, rgba(5, 71, 17, 0.1) 0px 25px 30px 0px; }
+        .parent:hover .card .bottom .social-buttons-container .social-button { transform: translate3d(0, 0, 50px); box-shadow: rgba(5, 71, 17, 0.2) -5px 20px 10px 0px; }
+        .parent:hover .card .logo .circle2 { transform: translate3d(0, 0, 60px); }
+        .parent:hover .card .logo .circle3 { transform: translate3d(0, 0, 80px); }
+        .parent:hover .card .logo .circle4 { transform: translate3d(0, 0, 100px); }
+        .parent:hover .card .logo .circle5 { transform: translate3d(0, 0, 120px); }
+
+        .main { display: flex; flex-direction: column; gap: 0.5em; }
+        .up { display: flex; flex-direction: row; gap: 0.5em; }
+        .down { display: flex; flex-direction: row; gap: 0.5em; }
+        .card1 { width: 90px; height: 90px; outline: none; border: none; background: white; border-radius: 90px 5px 5px 5px; box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px; transition: .2s ease-in-out; }
+        .instagram { margin-top: 1.5em; margin-left: 1.2em; fill: #cc39a4; }
+        .card2 { width: 90px; height: 90px; outline: none; border: none; background: white; border-radius: 5px 90px 5px 5px; box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px; transition: .2s ease-in-out; }
+        .twitter { margin-top: 1.5em; margin-left: -.9em; fill: #03A9F4; }
+        .card3 { width: 90px; height: 90px; outline: none; border: none; background: white; border-radius: 5px 5px 5px 90px; box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px; transition: .2s ease-in-out; }
+        .github { margin-top: -.6em; margin-left: 1.2em; }
+        .card4 { width: 90px; height: 90px; outline: none; border: none; background: white; border-radius: 5px 5px 90px 5px; box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px; transition: .2s ease-in-out; }
+        .discord { margin-top: -.9em; margin-left: -1.2em; fill: #8c9eff; }
+        .card1:hover { cursor: pointer; scale: 1.1; background-color: #cc39a4; } .card1:hover .instagram { fill: white; }
+        .card2:hover { cursor: pointer; scale: 1.1; background-color: #03A9F4; } .card2:hover .twitter { fill: white; }
+        .card3:hover { cursor: pointer; scale: 1.1; background-color: black; } .card3:hover .github { fill: white; }
+        .card4:hover { cursor: pointer; scale: 1.1; background-color: #8c9eff; } .card4:hover .discord { fill: white; }
+
+        /* --- TERMINAL HACKER INPUT --- */
+        .terminal-box { position: relative; background: black; border: 2px solid var(--neon-green); padding: 1.5rem; border-radius: 0.5rem; width: 100%; max-width: 400px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); overflow: hidden; margin-bottom: 2rem; }
+        .terminal-corner { position: absolute; width: 1.5rem; height: 1.5rem; background-color: var(--neon-green); }
+        .c-tl-h { top: 0; left: 0; height: 4px; width: 1.5rem; } .c-tr-h { top: 0; right: 0; height: 4px; width: 1.5rem; } .c-bl-h { bottom: 0; left: 0; height: 4px; width: 1.5rem; } .c-br-h { bottom: 0; right: 0; height: 4px; width: 1.5rem; }
+        .c-tl-v { top: 0; left: 0; height: 1.5rem; width: 4px; } .c-tr-v { top: 0; right: 0; height: 1.5rem; width: 4px; } .c-bl-v { bottom: 0; left: 0; height: 1.5rem; width: 4px; } .c-br-v { bottom: 0; right: 0; height: 1.5rem; width: 4px; }
+        .terminal-bg-gradient { position: absolute; inset: 0; top: 0; height: 4rem; background: linear-gradient(to bottom, transparent, rgba(20, 83, 45, 0.2), transparent); pointer-events: none; }
+        .terminal-label { margin-bottom: 0.75rem; color: var(--neon-green); font-size: 0.875rem; letter-spacing: 0.05em; display: flex; align-items: center; font-family: monospace; }
+        .terminal-arrow { margin-right: 0.5rem; color: #16a34a; }
+        .terminal-blink { margin-left: 0.5rem; opacity: 0.75; animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .input-wrapper { position: relative; }
+        .terminal-input { width: 100%; background: transparent; color: #86efac; font-size: 1rem; border: 2px solid #22c55e; border-radius: 0.375rem; padding: 0.75rem; padding-right: 2.5rem; outline: none; box-sizing: border-box; font-family: var(--font-SpaceMono); }
+        .terminal-input:focus { box-shadow: 0 0 0 2px var(--neon-green); border-color: #16a34a; }
+        .terminal-input::placeholder { color: rgba(22, 101, 52, 0.6); }
+        .input-icon { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); width: 1.25rem; height: 1.25rem; color: #22c55e; pointer-events: none; }
+        .decoration-line { position: absolute; background-color: rgba(34, 197, 94, 0.5); width: 1px; }
+        .dec-1 { top: 0; right: 3rem; height: 1rem; } .dec-2 { top: 0; right: 4rem; height: 1.5rem; opacity: 0.3; } .dec-3 { top: 0; right: 5rem; height: 0.5rem; opacity: 0.7; }
+        .dec-4 { bottom: 0; left: 3rem; height: 1rem; } .dec-5 { bottom: 0; left: 4rem; height: 1.5rem; opacity: 0.3; } .dec-6 { bottom: 0; left: 5rem; height: 0.5rem; opacity: 0.7; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        #terminal-logs { margin-top: 15px; font-family: var(--font-SpaceMono); font-size: 0.85rem; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        .log-line { display: block; opacity: 0; animation: fadeIn 0.3s forwards; }
+        .log-line.processing { color: #fbbf24; }
+        .log-line.error { color: #ef4444; }
+        .log-line.info { color: #86efac; margin-left: 10px; }
+
+        /* --- UTILS --- */
+        .app-box { background: rgba(0,0,0,0.9); border: 1px solid var(--neon-green); padding: 2rem; border-radius: 8px; width: 100%; max-width: 500px; box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); font-family: var(--font-SpaceMono); }
+        .app-header { color: var(--neon-green); font-size: 1.5rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 1px solid #14532d; padding-bottom: 10px; }
+        .placeholder-text { color: #aaa; text-align: center; margin-bottom: 20px; }
+        .calc-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .calc-input { background: #111; border: 1px solid #333; color: white; padding: 8px; border-radius: 4px; width: 100%; font-family: var(--font-SpaceMono); }
+        .calc-btn { background: var(--dark-green); color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; margin-top: 10px; font-family: var(--font-SpaceMono); transition: 0.2s; }
+        .calc-btn:hover { background: var(--neon-green); color: black; }
+        #cgpa-result { margin-top: 20px; font-size: 1.2rem; color: white; font-weight: bold; }
+        .todo-input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        .todo-list { list-style: none; padding: 0; }
+        .todo-item { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 10px; margin-bottom: 8px; border-left: 3px solid var(--neon-green); }
+        .todo-text { color: white; cursor: pointer; }
+        .todo-text.done { text-decoration: line-through; color: #666; }
+        .delete-btn { color: #ff4141; background: none; border: none; cursor: pointer; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <div id="loader-wrapper">
+        <div class="loader"><span></span></div>
+    </div>
+
+    <button class="toggle-btn" id="sidebar-toggle" style="display: none;" onclick="toggleSidebar()">☰</button>
+
+    <div class="header-controls" id="header-controls">
+        <label class="matrix-toggle-wrapper">
+            <input type="checkbox" id="matrix-toggle" checked>
+            <span class="matrix-slider"></span>
+        </label>
+        <button class="Btn" onclick="location.reload()">
+            <div class="sign"><svg viewBox="0 0 512 512"><path d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z"></path></svg></div>
+            <div class="text">Logout</div>
+        </button>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <a class="nav-link active" onclick="switchTab('home')">Home</a>
+        <a class="nav-link" onclick="switchTab('courses')">Courses</a>
+        <a class="nav-link" onclick="switchTab('cgpa')">CGPA Cal</a>
+        <a class="nav-link" onclick="switchTab('pyq')">PYQ</a>
+        <a class="nav-link" onclick="switchTab('youtube')">Youtube Lectures</a>
+        <a class="nav-link" onclick="switchTab('about')">About</a>
+        <a class="nav-link" onclick="switchTab('others')">Others</a>
+    </div>
+
+    <div class="matrix-container"><div class="matrix-pattern"></div></div>
+
+    <div id="app-container">
+        <div class="login-view" id="login-view">
+            <form class="form" onsubmit="event.preventDefault(); enterDashboard();">
+                <div class="radio-inputs">
+                    <label class="radio"><input type="radio" name="radio" id="signin-radio" checked><span class="radio-item">Sign In</span></label>
+                    <label class="radio"><input type="radio" name="radio" id="signup-radio"><span class="radio-item">Sign Up</span></label>
+                </div>
+                <p>Welcome<span id="form-subtitle">Login to continue</span></p>
+                <input type="email" placeholder="Email" required>
+                <input type="password" placeholder="Password" required>
+                <button class="oauthButton" id="submit-btn">Login</button>
+                <div class="separator"><div></div><span>OR</span><div></div></div>
+                <button class="oauthButton" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"></path><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path></svg>Continue with Google</button>
+                <button class="oauthButton" type="button"><svg class="icon" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg></button>
+            </form>
+        </div>
+
+        <div class="dashboard-view" id="dashboard-view">
+            <div id="home-view" class="page-section active">
+                <div class="hero-container">
+                    <h1 class="hero-title"><span class="text-blue-gradient">The Study Hub</span><span class="text-mint-gradient">I Wish I Had</span></h1>
+                    <p class="hero-description">As a student, I know the struggle of scrolling through endless sites just to find one decent lecture or note. That’s why I built BPSPlanner.</p>
+                    <button class="start-btn" onclick="switchTab('courses')">Start Now ></button>
+                </div>
+            </div>
+
+            <div id="courses-view" class="page-section">
+                <div class="terminal-box">
+                    <div class="terminal-corner c-tl-h"></div><div class="terminal-corner c-tl-v"></div>
+                    <div class="terminal-corner c-tr-h"></div><div class="terminal-corner c-tr-v"></div>
+                    <div class="terminal-corner c-bl-h"></div><div class="terminal-corner c-bl-v"></div>
+                    <div class="terminal-corner c-br-h"></div><div class="terminal-corner c-br-v"></div>
+                    <div class="terminal-bg-gradient"></div>
+                    <label class="terminal-label"><span class="terminal-arrow">➜</span><span class="font-bold">WHICH SEMESTER</span><span class="terminal-blink">▋</span></label>
+                    <div class="input-wrapper">
+                        <input class="terminal-input" placeholder="➤ ENTER THE SEM (e.g., 4)" id="sem-input" type="text" />
+                        <div class="input-icon"><svg stroke="currentColor" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path></svg></div>
+                    </div>
+                    <div id="terminal-logs"></div>
+                    <div class="decoration-line dec-1"></div><div class="decoration-line dec-2"></div><div class="decoration-line dec-3"></div>
+                    <div class="decoration-line dec-4"></div><div class="decoration-line dec-5"></div><div class="decoration-line dec-6"></div>
+                </div>
+            </div>
+
+            <div id="cgpa-view" class="page-section">
+                <div class="app-box">
+                    <div class="app-header">Grade Protocol</div>
+                    <div id="calculator-rows">
+                        <div class="calc-row"><input type="number" placeholder="Credits" class="calc-input credit-input"><input type="number" placeholder="Grade (1-10)" class="calc-input grade-input"></div>
+                        <div class="calc-row"><input type="number" placeholder="Credits" class="calc-input credit-input"><input type="number" placeholder="Grade (1-10)" class="calc-input grade-input"></div>
+                    </div>
+                    <button class="calc-btn" onclick="addSubjectRow()">+ Add Subject</button>
+                    <button class="calc-btn" style="float: right;" onclick="calculateCGPA()">Calculate</button>
+                    <div id="cgpa-result"></div>
+                </div>
+            </div>
+
+            <div id="pyq-view" class="page-section">
+                <div class="app-box">
+                    <div class="app-header">Past Year Questions</div>
+                    <p class="placeholder-text">Select your year to download question papers.</p>
+                    <button class="calc-btn" style="width:100%; margin-bottom:10px;">2024 Papers [PDF]</button>
+                    <button class="calc-btn" style="width:100%; margin-bottom:10px;">2023 Papers [PDF]</button>
+                </div>
+            </div>
+
+            <div id="youtube-view" class="page-section">
+                <div class="app-box">
+                    <div class="app-header">Video Playlists</div>
+                    <div style="background:#111; padding:10px; margin-bottom:10px; border-left:2px solid red;">
+                        <strong style="color:white; display:block;">Maths III - Complete Playlist</strong><small style="color:#666;">By Gajendra Purohit</small>
+                    </div>
+                </div>
+            </div>
+
+            <div id="todo-view" class="page-section">
+                <div class="app-box">
+                    <div class="app-header">Mission Log</div>
+                    <div class="todo-input-group">
+                        <input type="text" id="new-task-input" class="calc-input" placeholder="New Objective...">
+                        <button class="calc-btn" style="margin-top:0;" onclick="addTask()">Add</button>
+                    </div>
+                    <ul class="todo-list" id="todo-list"></ul>
+                </div>
+            </div>
+
+            <div id="about-view" class="page-section">
+                <div class="left-column">
+                    <div class="parent">
+                        <div class="card">
+                            <div class="logo"><span class="circle circle1"></span><span class="circle circle2"></span><span class="circle circle3"></span><span class="circle circle4"></span><span class="circle circle5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="svg"><path d="M12 0L1.3 6.3l4 2.3L12 4.6l6.7 4-4 2.3L4 16.6l8 4.6 8-4.6 2.7-1.5v-8L12 0zm0 2.3l8 4.6-1.3.8-6.7-3.8-6.7 3.8-1.3-.8L12 2.3zM2.7 8.3L12 13.7l9.3-5.4v7.4L12 21.1 2.7 15.7V8.3z"></path></svg></span></div>
+                            <div class="glass"></div>
+                            <div class="content"><span class="title">PAVAN</span><span class="text">Front-end Developer & Designer</span></div>
+                            <div class="bottom">
+                                <div class="social-buttons-container">
+                                    <button class="social-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="svg"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg></button>
+                                    <button class="social-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="svg"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg></button>
+                                    <button class="social-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg></button>
+                                </div>
+                                <div class="view-more"><button class="view-more-button">View More</button><svg class="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="main">
+                        <div class="up">
+                          <button class="card1"><svg class="instagram" width="30" height="30" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></button>
+                          <button class="card2"><svg class="twitter" width="30" height="30" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg></button>
+                        </div>
+                        <div class="down">
+                          <button class="card3"><svg class="github" width="30" height="30" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg></button>
+                          <button class="card4"><svg class="discord" width="30" height="30" viewBox="0 0 24 24"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419z"/></svg></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="others-view" class="page-section">
+                <div class="app-box">
+                    <div class="app-header">Extra Resources</div>
+                    <ul style="color:#aaa; text-align:left; line-height:2;">
+                        <li>• Student Handbook 2024</li>
+                        <li>• Academic Calendar</li>
+                        <li>• Fee Structure</li>
+                        <li>• Library Portal</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function enterDashboard() {
+            document.getElementById('login-view').style.display = 'none';
+            const dashboard = document.getElementById('dashboard-view');
+            dashboard.style.display = 'flex';
+            document.getElementById('header-controls').style.display = 'flex';
+            document.getElementById('sidebar-toggle').style.display = 'block'; 
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        function switchTab(tabName) {
+            document.getElementById('sidebar').classList.remove('open');
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            if(tabName === 'home') document.getElementById('home-view').classList.add('active');
+            if(tabName === 'courses') document.getElementById('courses-view').classList.add('active');
+            if(tabName === 'cgpa') document.getElementById('cgpa-view').classList.add('active');
+            if(tabName === 'todo') document.getElementById('todo-view').classList.add('active');
+            if(tabName === 'pyq') document.getElementById('pyq-view').classList.add('active');
+            if(tabName === 'youtube') document.getElementById('youtube-view').classList.add('active');
+            if(tabName === 'about') document.getElementById('about-view').classList.add('active');
+            if(tabName === 'others') document.getElementById('others-view').classList.add('active');
+        }
+
+        function createMatrix() {
+            const container = document.querySelector('.matrix-pattern');
+            container.innerHTML = ''; 
+            const screenWidth = window.innerWidth;
+            const columnWidth = 20; 
+            const columns = Math.ceil(screenWidth / columnWidth);
+            for (let i = 0; i < columns; i++) {
+                const col = document.createElement('div');
+                col.classList.add('matrix-column');
+                col.style.left = `${i * columnWidth}px`;
+                const duration = Math.random() * 3 + 2;
+                const delay = Math.random() * -5;
+                col.style.animationDuration = `${duration}s`;
+                col.style.animationDelay = `${delay}s`;
+                container.appendChild(col);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            createMatrix();
+            window.addEventListener('resize', createMatrix);
+            setTimeout(() => {
+                document.getElementById('loader-wrapper').style.display = 'none';
+                document.getElementById('app-container').style.display = 'block';
+            }, 4000); 
+
+            // MATRIX TOGGLE LOGIC
+            const matrixToggle = document.getElementById('matrix-toggle');
+            const matrixContainer = document.querySelector('.matrix-container');
+            if (matrixToggle) {
+                matrixToggle.addEventListener('change', () => {
+                    if (matrixToggle.checked) {
+                        matrixContainer.style.display = 'block';
+                    } else {
+                        matrixContainer.style.display = 'none';
+                    }
+                });
+            }
+
+            // COURSE SEARCH LOGIC
+            const semInput = document.getElementById('sem-input');
+            const terminalLogs = document.getElementById('terminal-logs');
+
+            // --- DATA UPDATE ---
+            const semesterResources = {
+                "1": [
+                    { code: "CHY1009", name: "Engineering Chemistry", files: ["2023_Paper.pdf"] },
+                    { code: "CSE1012", name: "Problem Solving using C", files: ["Lab_Manual.pdf"] },
+                    { code: "ECE1002", name: "Semiconductor Physics", files: ["Notes_Unit1.pdf"] },
+                    { code: "ENG1001", name: "Technical English", files: ["Grammar_Rules.pdf"] },
+                    { code: "MATH1001", name: "Calculus & Linear Algebra", files: ["Formula_Sheet.pdf"] },
+                    { code: "MGT1001", name: "Principles of Management", files: ["Case_Studies.pdf"] }
+                ],
+                "4": [
+                    { 
+                        code: "CSE1005", 
+                        name: "Computer Architecture and Organization", 
+                        files: ["CSE1005.1.pdf", "CSE1005.2.pdf", "CSE1005.pdf"] 
+                    },
+                    // Placeholder courses for Sem 4
+                    { code: "CSE2005", name: "Operating Systems", files: [] },
+                    { code: "CSE2004", name: "DBMS", files: [] }
+                ]
+            };
+
+            const alertColors = ['green', 'blue', 'yellow', 'red'];
+
+            window.showResources = function(courseCode, fileList) {
+                const resourceLog = document.createElement('div');
+                resourceLog.className = 'log-line processing';
+                resourceLog.style.marginTop = '10px';
+                resourceLog.innerHTML = `> ACCESSING ${courseCode} DATABASE...`;
+                terminalLogs.prepend(resourceLog);
+
+                setTimeout(() => {
+                    const filesContainer = document.createElement('div');
+                    filesContainer.className = 'log-line success';
+                    filesContainer.innerHTML = `> FILES FOUND FOR ${courseCode}:`;
+                    
+                    if(fileList.length > 0) {
+                        fileList.forEach(file => {
+                            const link = document.createElement('a');
+                            link.href = file; // Direct link to root
+                            link.className = 'file-link';
+                            link.textContent = `[DOWNLOAD] ${file}`;
+                            link.setAttribute('download', file);
+                            filesContainer.appendChild(link);
+                        });
+                    } else {
+                        const noFiles = document.createElement('div');
+                        noFiles.style.marginLeft = '2rem';
+                        noFiles.style.color = '#666';
+                        noFiles.textContent = "[NO FILES UPLOADED YET]";
+                        filesContainer.appendChild(noFiles);
+                    }
+                    
+                    terminalLogs.prepend(filesContainer);
+                }, 600);
+            };
+
+            if(semInput) {
+                semInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        const sem = this.value.trim();
+                        if (!sem) return;
+
+                        const processLog = document.createElement('span');
+                        processLog.className = 'log-line processing';
+                        processLog.textContent = `> Accessing Semester ${sem} Database...`;
+                        terminalLogs.prepend(processLog);
+
+                        this.value = ''; 
+
+                        setTimeout(() => {
+                            if (semesterResources[sem]) {
+                                const alertsContainer = document.createElement('div');
+                                alertsContainer.className = 'space-y-2 p-4 log-line';
+                                alertsContainer.style.animation = "fadeIn 0.3s forwards";
+
+                                semesterResources[sem].forEach((course, index) => {
+                                    const color = alertColors[index % alertColors.length];
+                                    const filesString = JSON.stringify(course.files).replace(/"/g, '&quot;');
+                                    
+                                    const alertHTML = `
+                                        <div role="alert" onclick="showResources('${course.code}', ${filesString})" class="alert-box alert-${color} border-l-4 p-2 rounded-lg flex items-center">
+                                            <svg stroke="currentColor" viewBox="0 0 24 24" fill="none" class="h-5 w-5 flex-shrink-0 mr-2" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M13 16h-1v-4h1m0-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+                                            </svg>
+                                            <p class="text-xs font-semibold">${course.code} - ${course.name}</p>
+                                        </div>
+                                    `;
+                                    alertsContainer.innerHTML += alertHTML;
+                                });
+                                terminalLogs.prepend(alertsContainer);
+                            } else {
+                                const resultLog = document.createElement('span');
+                                resultLog.className = 'log-line error';
+                                resultLog.textContent = `> ERROR: Data for Semester ${sem} not found.`;
+                                terminalLogs.prepend(resultLog);
+                            }
+                        }, 800);
+                    }
+                });
+            }
+        });
+
+        function addSubjectRow() {
+            const container = document.getElementById('calculator-rows');
+            const newRow = document.createElement('div');
+            newRow.className = 'calc-row';
+            newRow.innerHTML = `<input type="number" placeholder="Credits" class="calc-input credit-input"><input type="number" placeholder="Grade (1-10)" class="calc-input grade-input">`;
+            container.appendChild(newRow);
+        }
+
+        function calculateCGPA() {
+            const credits = document.querySelectorAll('.credit-input');
+            const grades = document.querySelectorAll('.grade-input');
+            let totalCredits = 0;
+            let totalPoints = 0;
+            let validRows = 0;
+            for(let i=0; i<credits.length; i++) {
+                const cred = parseFloat(credits[i].value);
+                const grd = parseFloat(grades[i].value);
+                if(!isNaN(cred) && !isNaN(grd)) {
+                    totalCredits += cred;
+                    totalPoints += (cred * grd);
+                    validRows++;
+                }
+            }
+            const resultDiv = document.getElementById('cgpa-result');
+            if(validRows === 0 || totalCredits === 0) {
+                resultDiv.style.color = '#ff4141';
+                resultDiv.innerHTML = "ERROR: Input valid data.";
+            } else {
+                const cgpa = (totalPoints / totalCredits).toFixed(2);
+                resultDiv.style.color = '#39ff14';
+                resultDiv.innerHTML = `CALCULATED SGPA: ${cgpa}`;
+            }
+        }
+
+        function addTask() {
+            const input = document.getElementById('new-task-input');
+            const text = input.value.trim();
+            if(!text) return;
+            const list = document.getElementById('todo-list');
+            const li = document.createElement('li');
+            li.className = 'todo-item';
+            li.innerHTML = `<span class="todo-text" onclick="this.classList.toggle('done')">${text}</span><button class="delete-btn" onclick="this.parentElement.remove()">X</button>`;
+            list.prepend(li); 
+            input.value = '';
+        }
+    </script>
+
+</body>
+</html>
